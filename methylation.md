@@ -1,3 +1,7 @@
+# 目的 
+学习基于bismark和DSS软件包的甲基化数据分析流程 #Bismark可高效率的分析亚硫酸氢盐序列(BS-Seq)数据。Bismark用参考基因组进行比对，同时进行胞嘧啶甲基化提取。Bismark是用Perl编写的，在命令行运行。用亚硫酸氢盐处理的reads用短Reads对准软件Bowtie 2或HISAT2进行比对。
+
+熟悉Linux服务器工作空间和基本的生物信息数据分析协议
 # 测序数据
 
 Open browser, vist EBI-ENA search page and search for the GEO accession. On the result page, we could get the expected FTP address. Use aria2 to download the data and we could get .fastq.gz files.
@@ -19,6 +23,7 @@ mkdir -p NBT_repeat/data/genome_data
 cd NBT_repeat/data/genome_data
 
 # Basic command line download
+#Aria2 是一款多线程下载工具，可以同时下载多个文件 -d指定下载文件的目录，-d ./：指定下载目录为当前目录（./）；-Z：启用压缩支持。aria2c 将自动解压下载的文件。
 aria2c -d ./ -Z https://ftp.ensembl.org/pub/release-109/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.chromosome.1.fa.gz
 aria2c -d ./ -Z https://ftp.ensembl.org/pub/release-109/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.chromosome.5.fa.gz
 aria2c -d ./ -Z https://ftp.ensembl.org/pub/release-109/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.chromosome.9.fa.gz
@@ -31,11 +36,13 @@ aria2c -d ./ -Z https://ftp.ensembl.org/pub/release-109/fasta/homo_sapiens/dna/H
 ```
 cd /mnt/c/shengxin/NBT_repeat/data/seq_data/
 
-# quality control to see the quality of the raw seq-data
+# 质控，查看原始seq数据的质量
 fastqc --t 3 ./WT_mESC_rep1/*.fastq.gz ./TetTKO_mESC_rep1/*.fastq.gz
+#fastqc 是一款用于分析原始测序数据质量的工具。它可以生成关于测序数据质量、GC含量、序列重复性等方面的统计报告。-t 3：指定使用 3 个线程并发处理分析任务。通配符 *.fastq.gz 表示匹配
 
-# quality and adapter trimming, followd by fastqc operation
+# 质量和适配器修剪，随后fastqc操作；即依次对每个匹配到的 fastq.gz 文件进行质量修剪和过滤，并将处理后的结果保存到指定的输出目录中。同时，根据 --fastqc 选项，trim_galore 还会为每个处理后的文件生成相应的质量控制报告
 trim_galore -o ./WT_mESC_rep1/trimmed_data/ --fastqc ./WT_mESC_rep1/*.fastq.gz
+#trim_galore 是一个用于自动化质量修剪和去除低质量序列的工具。它可以检测和去除低质量的碱基、读长不匹配、接头污染等。
 
 # Trim Galore used options:
 -o/--output_dir <DIR>: If specified all output will be written to this directory instead of the current directory. If the directory doesn't exist it will be created for you.
@@ -44,7 +51,7 @@ trim_galore -o ./WT_mESC_rep1/trimmed_data/ --fastqc ./WT_mESC_rep1/*.fastq.gz
 打开fastqc.html文件，可以看到C含量几乎没有，本样本测序测定了处理后的甲基化水平，C已经被变成U/T，只有5hmC仍被识别为C，所以是正常的
 # 甲基化分析
 
-After the quality control and adapter trimming, BS-seq data analysis protocal based on Bismark could be followed to do the methylation analysis for the ACE-seq data as well.
+在质量控制和适配器修剪后，可以按照基于Bismark的BS-seq数据分析协议对ACE-seq数据进行甲基化分析。
 
 用法参考网址 
 
@@ -61,7 +68,7 @@ bismark的分析分为三步：
 
 # 1. 基因组索引
 
-Before alignments can be carried out, the genome of interest needs to be bisulfite converted in-silico and indexed. Based on Bismark, we can use both Bowtie and Bowtie2 to do the indexing work.
+在进行比对之前，需要对感兴趣的基因组进行亚硫酸盐转换和索引。基于Bismark，我们可以同时使用Bowtie和Bowtie2来完成索引工作。
 
 #下载bismark
 
@@ -73,8 +80,8 @@ Before alignments can be carried out, the genome of interest needs to be bisulfi
 
 ```
 cd /mnt/c/shengxin/NBT_repeat/data/seq_data/
-
-命令：bismark_genome_preparation [options] <path_to_genome_folder>
+#使用bismark_genome_preparation来对基因组进行处理，输入是给定的目录，目录里面是.fa或者.fasta文件。
+命令：bismark_genome_preparation [options] <path_to_genome_folder> #genome_folder 基因组文件夹
 # bismark_genome_preparation --path_to_bowtie这里使用bowtie2 <path_to_genome_folder>   索引路径 
 结果：在基因组目录下产生Bisulfite_Genome目录
 
@@ -86,7 +93,11 @@ bismark_genome_preparation --bowtie2 /mnt/c/shengxin/NBT_repeat/data/genome_data
 ```--bowtie2```: This will create bisulfite indexes for Bowtie 2. (Default: ON).
 
 # 2. 比对
-The core of the methylation data analysis procedure is to align the sequencing reads to the reference genome, and it is assumed that all data have been quality and adapter trimmed. The alignment reports could be found in sub-directory bismark-alignment-reports/.
+甲基化数据分析程序的核心是将测序读数与参考基因组对齐，并且假设所有数据都已经过质量和适配器修剪。对齐报告可以在子目录bismark-align -reports/中找到。
+
+比对的过程需要提供两个信息：
+输入目录：已经建立好的索引目录，即基因组索引步骤中的索引目录
+输入文件：测序reads，fastq格式
 
 Bismark支持：
 
@@ -116,9 +127,9 @@ cat: Command concatenate BAMs
 
 # Aligned reads deduplication-去重
 
-Mammalian genomes are so huge that it is rather unlikely to encounter several genuinely independent fragments which align to the very same genomic position. It is much more likely that such reads are a result of PCR amplification. For large genomes, removing duplicate reads is therefore a valid route to take.
+哺乳动物的基因组是如此之大，以至于不太可能遇到几个真正独立的片段，它们排列在同一个基因组位置。这种解读更有可能是PCR扩增的结果。因此，对于大型基因组来说，去除重复读取是一条有效的途径。
 
-The deduplication step could be finished through the deduplicate_bismark script, and the deduplication report could be found in sub-directory deduplication-reports/.
+重复数据删除步骤可以通过deduplicate_bismark脚本完成，重复数据删除报告可以在子目录deduplicate_reports /中找到
 
 ```
 cd /mnt/c/shengxin/NBT_repeat/data/seq_data/
@@ -128,7 +139,7 @@ mkdir -p ./TetTKO_mESC_rep1/deduplicated_result/
 # aligned reads deduplication
 deduplicate_bismark --bam [options] <filenames> 
 --bam: The output will be written out in BAM format instead of the default SAM format.
---output_dir 输出目录 --bam  比对后的BAM输出文件
+--output_dir 输出目录 --bam  比对后的BAM输出文件；bam与sam是同一文件的不同压缩方式，sam占据的内存更小，压缩更高，二进制形式
 
 deduplicate_bismark --bam --output_dir ./WT_mESC_rep1/deduplicated_result/ ./WT_mESC_rep1/bismark_result/SRX4241790_trimmed_bismark_bt2.bam
 
@@ -136,7 +147,7 @@ deduplicate_bismark --bam --output_dir ./TetTKO_mESC_rep1/deduplicated_result/ .
 ```
 
 # Methylation information extracting-甲基化信息提取
-The bimark_methylation_extractor script in the Bismark package could extract the methylation information from the alignment result files and act as the endpoint of the Bismark package.  In addition, the methylation information could be easily transfered into other format facilitating the downstream analysis in this script.
+Bismark包中的bimark_methylation_extractor脚本可以从比对结果文件中提取甲基化信息，并充当Bismark包的端点。此外，甲基化信息可以很容易地转换成其他格式，便于脚本中的下游分析。
 
 bismark_methylation_extractor
 是一个非常重要的输出文件为全基因组胞嘧啶报告文件（*CX_report.txt），该文件是一个非常核心的记录胞嘧啶深度信息的文件，可进行甲基化水平的计算、区域甲基化信号文件的转化、差异甲基化水平的计算等。
@@ -159,7 +170,7 @@ genome_path="/mnt/c/shengxin/NBT_repeat/data/genome_data/"
 cd /mnt/c/shengxin/NBT_repeat/data/seq_data/
 
 # methylation information extracting
-bismark_methylation_extractor --single-end --gzip --parallel 4 --bedGraph \
+bismark_methylation_extractor --single-end --gzip --parallel 4 --bedGraph \#生信文件格式 | BedGraph（基因组浏览器绘制），甲基化提取的输出可以使用选项--bedGraph转换为一个bedGraph和coverage文件
 --cytosine_report --genome_folder ${genome_path} \
 -o ./WT_mESC_rep1/deduplicated_result/ ./WT_mESC_rep1/deduplicated_result/*.bam
 
@@ -264,7 +275,7 @@ cp ${file_WT_path} ./R_analysis/WT_data
 cp ${file_TetTKO_path} ./R_analysis/TetTKO_data
 
 # unzip
-gunzip -d ./R_analysis/WT_data/SRR7368841_bismark_bt2.deduplicated.bismark.cov.gz
+gunzip -d ./R_analysis/WT_data/SRR7368841_bismark_bt2.deduplicated.bismark.cov.gz #gunzip 是个使用广泛的解压缩程序；-d：解压缩文件
 gunzip -d ./R_analysis/TetTKO_data/SRR7368845_bismark_bt2.deduplicated.bismark.cov.gz
 
 # transfer the .cov file to .txt file
@@ -273,13 +284,71 @@ cp ./R_analysis/TetTKO_data/SRR7368845_bismark_bt2.deduplicated.bismark.cov ./R_
 
 # basic command line environment procedure 
 R
-```
-```
-library(tidyr)
+
+library(tidyr) #tidyr 包提供了用于数据整理和重塑的函数
+library(dplyr) #dplyr 包提供了用于数据处理和操作的函数
+library(DSS) #提供了用于甲基化数据分析的函数
+报错：没有DSS包
+解决方案：
+R
+install.packages("BiocManager")
+BiocManager::install("DSS", force = TRUE)
+library(DSS)
+
+cd /mnt/c/shengxin/NBT_repeat/R_analysis
+first_file <- "./WT_data/SRR7368841_methylation_result.txt"
+second_file <- "./TetTKO_data/SRR7368845_methylation_result.txt"
+file_prefix <- "mm_all_chr" #prefix选项是配置安装的路径
+file_save_path <- "./"
+
+# import data
+#用R的 read.table 函数来读取名为 first_file 的文件，并将其保存到一个名为 first_raw_data 的数据框中
+first_raw_data <- read.table(first_file, header = T, stringsAsFactors = F)#read.table 函数用于从文本文件中读取数据，并将其存储为数据框的形式;header = T，true是数据是含表头（列名，也称变量名）,即指定第一行为列名，将其视为文件的头部。
+second_raw_data <- read.table(second_file, header = T, stringsAsFactors = F) #stringsAsFactors = F意味着，“在读入数据时，遇到字符串之后，不将其转换为factors，仍然保留为字符串格式”
+
+# data manipulation to prepare for the BSseq objection
+#得到一个名为 DSS_first_input_data 的数据框，其中包含了经过处理后的数据，只保留了 chr、pos、N 和 X 四列。
+DSS_first_input_data <- first_raw_data %>%
+	mutate(chr = paste("chr", chr, sep = "")) %>%    
+    # mutate 创建新列；将 chr 列的值转换为以 "chr" 开头的形式，例如将 "1" 转换为 "chr1"
+	mutate(pos = start, N = methyled + unmethyled, X = methyled) %>%
+    #使用 mutate 函数将指定列的值重新赋给新的列名，并对其中的一些列进行计算和操作。pos 列的值将与 start 列相同，N 列的值将是 methyled 列和 unmethyled 列之和，X 列的值将与 methyled 列相同。
+ #paste函数是比较常用字符串处理函数，可以连接不同类型的变量及常量。基本语法如下：
+paste(..., sep = " ", collapse = NULL)
+其中，…表示一个或多个R可以被转化为字符型的对象；sep表示分隔符，默认为空格；
+	select(chr, pos, N, X)
+#select 函数选择包含指定列的数据框。这里选取了 chr、pos、N 和 X 列
+
+DSS_second_input_data <- second_raw_data %>% #％>％来自dplyr包的管道函数，是将前一步的结果直接传参给下一步的函数
+	mutate(chr = paste("chr", chr, sep = "")) %>%
+	mutate(pos = start, N = methyled + unmethyled, X = methyled) %>%
+	select(chr, pos, N, X)
+# 报错，找不到命令%>%
+解决方案
+R
 library(dplyr)
-file_names <- c("mnt/c/shengxin/NBT_repeat/R_analysis/WT_data/SRR7368841_methylation_result.txt", "./TetTKO_data/SRR7368845_methylation_result.txt")
-func_read_file <- function(file_name){
-	dir_vec <- strsplit(file_name, split = "/")[[1]]
+
+# create BSseq object and make the statical test
+#对两个输入数据进行甲基化差异分析
+bsobj <- makeBSseqData(list(DSS_first_input_data, DSS_second_input_data), c("S1", "S2"))#使用了标识符 "S1" 表示第一个样本，"S2" 表示第二个样本。将结果保存在 bsobj 中
+dmlTest <- DMLtest(bsobj, group1 = c("S1"), group2 = c("S2"), smoothing = T)#DMLtest:对亚硫酸酯测序(BS-seq)数据的两组比较进行差异甲基化位点(DML)的统计检验功能。该函数接受一个BSseq对象和两个组标签，然后对每个CpG位点的差异甲基化进行统计检验。DMLtest 函数对 bsobj 执行甲基化差异检验。group1 参数指定属于第一组的样本标识符，这里为 "S1"。group2 参数指定属于第二组的样本标识符，这里为 "S2"。smoothing 参数设置为 TRUE，表示进行平滑处理
+
+# dmls detection #DMLtest函数call DML
+dmls <- callDML(dmlTest, p.threshold = 0.001) #p.threshold = 0.001 参数来指定一个阈值，即 p 值的阈值。只有具有显著差异的甲基化位点，其 p 值低于或等于这个阈值时，才会被调用为 DML
+# dmrs detection
+dmrs <- callDMR(dmlTest, p.threshold=0.01)
+
+# output the results
+write.table(dmlTest, paste(file_save_path, file_prefix, "_DSS_test_result.txt", sep = ""), row.names = F)
+#第二个参数是要保存文件的路径和文件名。你使用 paste 函数将 file_save_path（保存路径）、file_prefix（文件前缀）和 "_DSS_test_result.txt" 进行拼接，生成完整的文件名
+#row.names = F 参数表示不包含行号
+write.table(dmls, paste(file_save_path, file_prefix, "_DSS_dmls_result.txt", sep = ""), row.names = F)
+write.table(dmrs, paste(file_save_path, file_prefix, "_DSS_dmrs_result.txt", sep = ""), row.names = F)
+
+
+
+
+
 
 
 
